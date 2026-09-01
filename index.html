@@ -1,5 +1,105 @@
 <!DOCTYPE html>
 <html lang="nl">
+  <style>
+.game-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+
+.rating-knop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #24242a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .15s ease;
+}
+
+.rating-knop:hover {
+  background: #303038;
+  transform: translateY(-1px);
+}
+
+.rating-knop.actief-like {
+  background: #183c2a;
+  color: #61e59a;
+}
+
+.rating-knop.actief-dislike {
+  background: #3d1c25;
+  color: #ff7189;
+}
+
+.rating-knop:disabled {
+  opacity: .55;
+  cursor: default;
+  transform: none;
+}
+
+.rating-score {
+  color: #8d8d97;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ranking-container {
+  margin-top: 25px;
+  padding: 18px;
+  border: 1px solid #29292e;
+  border-radius: 15px;
+  background: #18181b;
+}
+
+.ranking-titel {
+  margin: 0 0 14px;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.ranking-lijst {
+  display: grid;
+  gap: 8px;
+}
+
+.ranking-item {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  background: #222226;
+}
+
+.ranking-positie {
+  color: #ff4d6d;
+  font-weight: 900;
+}
+
+.ranking-naam {
+  overflow: hidden;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ranking-cijfer {
+  color: #a2a2ab;
+  font-size: 12px;
+  font-weight: 700;
+}
+</style>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1048,6 +1148,20 @@ main {
     class="games"
     id="gamesContainer"
   ></div>
+  <div class="ranking-container">
+
+  <h2 class="ranking-titel">
+    🏆 Game Ranking
+  </h2>
+
+  <div
+    class="ranking-lijst"
+    id="rankingLijst"
+  >
+    Ranking laden...
+  </div>
+
+</div>
 
   <div
     class="geen-resultaat"
@@ -1347,7 +1461,51 @@ main {
   </div>
 
 </div>
+  
+  /* ==================================================
+   SUPABASE
+================================================== */
 
+const SUPABASE_URL =
+  "https://ccjeunlavmkgcnqjgojp.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_QKLcfTbxXlpOGnykICFdBQ_0-uxatER";
+
+const supabaseClient =
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+/* ==================================================
+   DEVICE ID
+================================================== */
+
+function krijgDeviceId() {
+
+  let deviceId =
+    localStorage.getItem(
+      "flintgames_device_id"
+    );
+
+  if (!deviceId) {
+
+    deviceId =
+      crypto.randomUUID();
+
+    localStorage.setItem(
+      "flintgames_device_id",
+      deviceId
+    );
+
+  }
+
+  return deviceId;
+}
+  
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 
 /* ==================================================
@@ -1895,7 +2053,635 @@ function toonAndereGames() {
   );
 
 }
+/* ==================================================
+   RATING LADEN
+================================================== */
 
+async function laadRating(game) {
+
+  if (!game) {
+    return;
+  }
+
+  const rating =
+    document.getElementById(
+      "gameRating"
+    );
+
+  if (!rating) {
+    return;
+  }
+
+  const likeAantal =
+    document.getElementById(
+      "likeAantal"
+    );
+
+  const dislikeAantal =
+    document.getElementById(
+      "dislikeAantal"
+    );
+
+  const ratingScore =
+    document.getElementById(
+      "ratingScore"
+    );
+
+  const likeKnop =
+    document.getElementById(
+      "likeKnop"
+    );
+
+  const dislikeKnop =
+    document.getElementById(
+      "dislikeKnop"
+    );
+
+  const deviceId =
+    krijgDeviceId();
+
+  try {
+
+    const {
+      data: stats,
+      error: statsError
+    } = await supabaseClient
+      .from("game_ratings")
+      .select(
+        "likes, dislikes, total_votes, rating"
+      )
+      .eq(
+        "game_id",
+        game.naam
+      )
+      .maybeSingle();
+
+    if (statsError) {
+      throw statsError;
+    }
+
+    const likes =
+      Number(stats?.likes || 0);
+
+    const dislikes =
+      Number(stats?.dislikes || 0);
+
+    const totaal =
+      Number(stats?.total_votes || 0);
+
+    const percentage =
+      Number(stats?.rating || 0);
+
+    likeAantal.textContent =
+      likes;
+
+    dislikeAantal.textContent =
+      dislikes;
+
+    ratingScore.textContent =
+      totaal === 0
+        ? "Nog geen stemmen"
+        : percentage + "% positief";
+
+
+    const {
+      data: eigenStem,
+      error: eigenStemError
+    } = await supabaseClient
+      .from("game_votes")
+      .select("vote")
+      .eq(
+        "game_id",
+        game.naam
+      )
+      .eq(
+        "device_id",
+        deviceId
+      )
+      .maybeSingle();
+
+    if (eigenStemError) {
+      throw eigenStemError;
+    }
+
+    likeKnop.classList.remove(
+      "actief-like"
+    );
+
+    dislikeKnop.classList.remove(
+      "actief-dislike"
+    );
+
+    if (
+      eigenStem &&
+      eigenStem.vote === 1
+    ) {
+
+      likeKnop.classList.add(
+        "actief-like"
+      );
+
+    }
+
+    if (
+      eigenStem &&
+      eigenStem.vote === -1
+    ) {
+
+      dislikeKnop.classList.add(
+        "actief-dislike"
+      );
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Rating laden mislukt:",
+      error
+    );
+
+    ratingScore.textContent =
+      "Rating niet beschikbaar";
+
+  }
+}
+
+
+/* ==================================================
+   STEMMEN
+================================================== */
+
+async function stemOpGame(
+  waarde
+) {
+
+  if (!huidigeGame) {
+    return;
+  }
+
+  const deviceId =
+    krijgDeviceId();
+
+  const gameId =
+    huidigeGame.naam;
+
+  const likeKnop =
+    document.getElementById(
+      "likeKnop"
+    );
+
+  const dislikeKnop =
+    document.getElementById(
+      "dislikeKnop"
+    );
+
+  likeKnop.disabled = true;
+  dislikeKnop.disabled = true;
+
+  try {
+
+    const {
+      data: bestaandeStem,
+      error: zoekError
+    } = await supabaseClient
+      .from("game_votes")
+      .select(
+        "id, vote"
+      )
+      .eq(
+        "game_id",
+        gameId
+      )
+      .eq(
+        "device_id",
+        deviceId
+      )
+      .maybeSingle();
+
+    if (zoekError) {
+      throw zoekError;
+    }
+
+
+    /*
+      Nog geen stem:
+      toevoegen.
+    */
+
+    if (!bestaandeStem) {
+
+      const {
+        error
+      } = await supabaseClient
+        .from("game_votes")
+        .insert({
+
+          game_id:
+            gameId,
+
+          device_id:
+            deviceId,
+
+          vote:
+            waarde
+
+        });
+
+      if (error) {
+        throw error;
+      }
+
+    }
+
+
+    /*
+      Zelfde stem:
+      niets veranderen.
+    */
+
+    else if (
+      bestaandeStem.vote ===
+      waarde
+    ) {
+
+      likeKnop.disabled = false;
+      dislikeKnop.disabled = false;
+
+      return;
+
+    }
+
+
+    /*
+      Andere stem:
+      bestaande stem veranderen.
+    */
+
+    else {
+
+      const {
+        error
+      } = await supabaseClient
+        .from("game_votes")
+        .update({
+
+          vote:
+            waarde
+
+        })
+        .eq(
+          "id",
+          bestaandeStem.id
+        );
+
+      if (error) {
+        throw error;
+      }
+
+    }
+
+
+    await laadRating(
+      huidigeGame
+    );
+
+    await laadRanking();
+
+  } catch (error) {
+
+    console.error(
+      "Stem opslaan mislukt:",
+      error
+    );
+
+    alert(
+      "De beoordeling kon niet worden opgeslagen."
+    );
+
+  } finally {
+
+    likeKnop.disabled = false;
+    dislikeKnop.disabled = false;
+
+  }
+}
+
+
+/* ==================================================
+   RATING UI MAKEN
+================================================== */
+
+function maakGameRating() {
+
+  const bestaande =
+    document.getElementById(
+      "gameRating"
+    );
+
+  if (bestaande) {
+    bestaande.remove();
+  }
+
+  const topbar =
+    document.querySelector(
+      ".game-topbar"
+    );
+
+  if (!topbar) {
+    return;
+  }
+
+  const rating =
+    document.createElement(
+      "div"
+    );
+
+  rating.id =
+    "gameRating";
+
+  rating.className =
+    "game-rating";
+
+  rating.innerHTML = `
+
+    <button
+      type="button"
+      class="rating-knop"
+      id="likeKnop">
+      👍 <span id="likeAantal">0</span>
+    </button>
+
+    <button
+      type="button"
+      class="rating-knop"
+      id="dislikeKnop">
+      👎 <span id="dislikeAantal">0</span>
+    </button>
+
+    <span
+      class="rating-score"
+      id="ratingScore">
+      Laden...
+    </span>
+
+  `;
+
+  topbar.insertAdjacentElement(
+    "afterend",
+    rating
+  );
+
+
+  document.getElementById(
+    "likeKnop"
+  ).addEventListener(
+    "click",
+    function() {
+
+      stemOpGame(1);
+
+    }
+  );
+
+
+  document.getElementById(
+    "dislikeKnop"
+  ).addEventListener(
+    "click",
+    function() {
+
+      stemOpGame(-1);
+
+    }
+  );
+
+
+  laadRating(
+    huidigeGame
+  );
+}
+
+
+/* ==================================================
+   RANKING LADEN
+================================================== */
+
+async function laadRanking() {
+
+  const lijst =
+    document.getElementById(
+      "rankingLijst"
+    );
+
+  if (!lijst) {
+    return;
+  }
+
+  try {
+
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("game_ratings")
+      .select(
+        "game_id, likes, dislikes, total_votes, rating"
+      );
+
+    if (error) {
+      throw error;
+    }
+
+
+    const ranking =
+      (data || [])
+        .map(
+          function(item) {
+
+            const game =
+              links.find(
+                function(link) {
+
+                  return (
+                    link.naam ===
+                    item.game_id
+                  );
+
+                }
+              );
+
+            if (!game) {
+              return null;
+            }
+
+
+            const likes =
+              Number(
+                item.likes || 0
+              );
+
+            const dislikes =
+              Number(
+                item.dislikes || 0
+              );
+
+            const stemmen =
+              Number(
+                item.total_votes || 0
+              );
+
+            const percentage =
+              Number(
+                item.rating || 0
+              );
+
+
+            /*
+              Ranking op:
+              likes - dislikes
+            */
+
+            const score =
+              likes -
+              dislikes;
+
+
+            return {
+
+              game:
+                game,
+
+              likes:
+                likes,
+
+              dislikes:
+                dislikes,
+
+              stemmen:
+                stemmen,
+
+              percentage:
+                percentage,
+
+              score:
+                score
+
+            };
+
+          }
+        )
+        .filter(
+          Boolean
+        )
+        .sort(
+          function(a, b) {
+
+            if (
+              b.score !==
+              a.score
+            ) {
+
+              return (
+                b.score -
+                a.score
+              );
+
+            }
+
+            if (
+              b.percentage !==
+              a.percentage
+            ) {
+
+              return (
+                b.percentage -
+                a.percentage
+              );
+
+            }
+
+            return (
+              b.stemmen -
+              a.stemmen
+            );
+
+          }
+        )
+        .slice(
+          0,
+          10
+        );
+
+
+    lijst.innerHTML =
+      "";
+
+
+    if (
+      ranking.length === 0
+    ) {
+
+      lijst.innerHTML =
+        "<div>Nog geen beoordelingen.</div>";
+
+      return;
+
+    }
+
+
+    ranking.forEach(
+      function(item, index) {
+
+        const rij =
+          document.createElement(
+            "div"
+          );
+
+        rij.className =
+          "ranking-item";
+
+        rij.innerHTML = `
+
+          <div class="ranking-positie">
+            #${index + 1}
+          </div>
+
+          <div class="ranking-naam">
+            ${escapeHTML(
+              item.game.naam
+            )}
+          </div>
+
+          <div class="ranking-cijfer">
+            ${item.score >= 0 ? "+" : ""}
+            ${item.score}
+            ·
+            ${item.percentage}%
+          </div>
+
+        `;
+
+        lijst.appendChild(
+          rij
+        );
+
+      }
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Ranking laden mislukt:",
+      error
+    );
+
+    lijst.innerHTML =
+      "<div>Ranking kon niet worden geladen.</div>";
+
+  }
+}
+  
 /* ==================================================
    GAME OPENEN
 ================================================== */
@@ -1913,6 +2699,8 @@ function openGame(game) {
 
     huidigeGame =
       game;
+
+    maakGameRating();
 
     externWaarschuwing.style.display =
       "flex";
@@ -2410,6 +3198,8 @@ document.addEventListener(
 toonGames(
   willekeurigeLinks
 );
+
+  laadRanking();
 
 </script>
 
